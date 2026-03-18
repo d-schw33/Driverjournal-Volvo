@@ -20,17 +20,30 @@ export default async function handler(req, res) {
     `);
   }
 
+  // Get PKCE code verifier from cookie
+  const codeVerifier = req.headers.cookie?.match(/pkce=([^;]+)/)?.[1];
+  if (!codeVerifier) {
+    return res.status(400).send(`
+      <h2>PKCE Error</h2>
+      <p>Code verifier missing – try logging in again.</p>
+      <br><a href="/">← Tillbaka</a>
+    `);
+  }
+
+  const tenantId = process.env.MS_TENANT_ID || 'common';
+
   try {
-    const tokenRes = await fetch('https://login.microsoftonline.com/e0714209-cb84-4e40-be0a-6555da0f9ebb/oauth2/v2.0/token', {
+    const tokenRes = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type:    'authorization_code',
+        grant_type:     'authorization_code',
         code,
-        redirect_uri:  process.env.MS_REDIRECT_URI,
-        client_id:     process.env.MS_CLIENT_ID,
-        client_secret: process.env.MS_CLIENT_SECRET,
-        scope:         'Calendars.Read User.Read offline_access'
+        redirect_uri:   process.env.MS_REDIRECT_URI,
+        client_id:      process.env.MS_CLIENT_ID,
+        client_secret:  process.env.MS_CLIENT_SECRET,
+        scope:          'Calendars.Read User.Read offline_access',
+        code_verifier:  codeVerifier
       }).toString()
     });
 
@@ -61,7 +74,10 @@ export default async function handler(req, res) {
     };
 
     await saveSession(sid, session);
-    res.setHeader('Set-Cookie', `session=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`);
+    res.setHeader('Set-Cookie', [
+      `session=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
+      `pkce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+    ]);
     res.redirect('/?ms=connected');
 
   } catch (e) {
