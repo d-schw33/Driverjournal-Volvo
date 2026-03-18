@@ -1,0 +1,11 @@
+export default function handler(req, res) {
+  const params = new URLSearchParams({
+    response_type:  'code',
+    client_id:      process.env.MS_CLIENT_ID,
+    redirect_uri:   process.env.MS_REDIRECT_URI,
+    scope:          'Calendars.Read User.Read offline_access',
+    response_mode:  'query',
+    state:          'korjournal'
+  });
+  res.redirect('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?' + params);
+}
