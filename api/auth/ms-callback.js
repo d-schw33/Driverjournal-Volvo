@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    const tokenRes = await fetch('https://login.microsoftonline.com/e0714209-cb84-4e40-be0a-6555da0f9ebb/oauth2/v2.0/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

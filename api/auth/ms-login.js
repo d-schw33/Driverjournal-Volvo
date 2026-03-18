@@ -7,5 +7,5 @@ export default function handler(req, res) {
     response_mode:  'query',
     state:          'korjournal'
   });
-  res.redirect('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?' + params);
+  res.redirect('https://login.microsoftonline.com/e0714209-cb84-4e40-be0a-6555da0f9ebb/oauth2/v2.0/authorize?' + params);
 }
