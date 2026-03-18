@@ -41,7 +41,6 @@ export default async function handler(req, res) {
         code,
         redirect_uri:   process.env.MS_REDIRECT_URI,
         client_id:      process.env.MS_CLIENT_ID,
-        client_secret:  process.env.MS_CLIENT_SECRET,
         scope:          'Calendars.Read User.Read offline_access',
         code_verifier:  codeVerifier
       }).toString()
