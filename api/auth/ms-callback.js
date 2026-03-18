@@ -1,9 +1,24 @@
 import { getSession, saveSession, newSessionId } from '../_utils.js';
 
 export default async function handler(req, res) {
-  const { code, error } = req.query;
-  if (error) return res.redirect('/?error=' + encodeURIComponent(error));
-  if (!code)  return res.redirect('/?error=no_code');
+  const { code, error, error_description } = req.query;
+
+  if (error) {
+    return res.status(400).send(`
+      <h2>Microsoft OAuth Error</h2>
+      <p><strong>Error:</strong> ${error}</p>
+      <p><strong>Description:</strong> ${error_description || 'none'}</p>
+      <br><a href="/">← Tillbaka</a>
+    `);
+  }
+
+  if (!code) {
+    return res.status(400).send(`
+      <h2>No code received</h2>
+      <p><strong>Query:</strong> ${JSON.stringify(req.query)}</p>
+      <br><a href="/">← Tillbaka</a>
+    `);
+  }
 
   try {
     const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
@@ -21,11 +36,15 @@ export default async function handler(req, res) {
 
     const data = await tokenRes.json();
     if (!tokenRes.ok) {
-      return res.redirect('/?error=' + encodeURIComponent(data.error_description || 'ms_token_failed'));
+      return res.status(400).send(`
+        <h2>Token Exchange Error</h2>
+        <p><strong>Error:</strong> ${data.error}</p>
+        <p><strong>Description:</strong> ${data.error_description}</p>
+        <br><a href="/">← Tillbaka</a>
+      `);
     }
 
-    // Fetch user info
-    const meRes  = await fetch('https://graph.microsoft.com/v1.0/me', {
+    const meRes = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: { Authorization: 'Bearer ' + data.access_token }
     });
     const me = meRes.ok ? await meRes.json() : {};
@@ -46,6 +65,10 @@ export default async function handler(req, res) {
     res.redirect('/?ms=connected');
 
   } catch (e) {
-    res.redirect('/?error=' + encodeURIComponent(e.message));
+    res.status(500).send(`
+      <h2>Server Error</h2>
+      <p>${e.message}</p>
+      <br><a href="/">← Tillbaka</a>
+    `);
   }
 }
