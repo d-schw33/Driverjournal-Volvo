@@ -33,16 +33,35 @@ export default async function handler(req, res) {
   const tenantId = process.env.MS_TENANT_ID || 'common';
 
   try {
-    const debugBody = {
+    const bodyParams = new URLSearchParams({
       grant_type:     'authorization_code',
-      code:           code?.substring(0, 20) + '...',
+      code,
       redirect_uri:   process.env.MS_REDIRECT_URI,
       client_id:      process.env.MS_CLIENT_ID,
-      client_secret:  process.env.MS_CLIENT_SECRET ? 'SET(' + process.env.MS_CLIENT_SECRET.length + 'chars)' : 'MISSING',
+      client_secret:  process.env.MS_CLIENT_SECRET,
       scope:          'Calendars.Read User.Read offline_access',
-      code_verifier:  codeVerifier ? 'SET' : 'MISSING'
-    };
-    return res.status(200).send(`<pre>${JSON.stringify(debugBody, null, 2)}</pre><br><a href="/">← Tillbaka</a>`);
+      code_verifier:  codeVerifier
+    });
+
+    const tokenRes = await fetch(`https://login.microsoftonline.com/${process.env.MS_TENANT_ID}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: bodyParams.toString()
+    });
+
+    const data = await tokenRes.json();
+
+    if (!tokenRes.ok) {
+      return res.status(400).send(`
+        <h2>Token Exchange Error (${tokenRes.status})</h2>
+        <p><strong>Error:</strong> ${data.error}</p>
+        <p><strong>Description:</strong> ${data.error_description}</p>
+        <p><strong>Sent client_id:</strong> ${process.env.MS_CLIENT_ID}</p>
+        <p><strong>Sent redirect_uri:</strong> ${process.env.MS_REDIRECT_URI}</p>
+        <p><strong>Sent tenant:</strong> ${process.env.MS_TENANT_ID}</p>
+        <br><a href="/">← Tillbaka</a>
+      `);
+    
 
     const tokenRes = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
       method: 'POST',
