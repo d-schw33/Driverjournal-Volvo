@@ -2,7 +2,10 @@
 const _loading = { volvo: false, outlook: false };
 
 // ── Init: check session status on load ───────────────────────────────────────
+let _sessionChecked = false;
 async function checkSession() {
+  if (_sessionChecked) return;
+  _sessionChecked = true;
   try {
     const res  = await fetch('/api/me');
     const data = await res.json();
