@@ -17,7 +17,11 @@ export default async function handler(req, res) {
     const vRes = await fetch('https://api.volvocars.com/connected-vehicle/v2/vehicles', {
       headers: { 'Authorization': 'Bearer ' + token, 'vcc-api-key': apiKey }
     });
-    if (!vRes.ok) return res.status(vRes.status).json({ error: 'Could not fetch vehicles', status: vRes.status });
+    if (!vRes.ok) {
+      const errBody = await vRes.json().catch(() => ({}));
+      console.log('Volvo vehicles error:', vRes.status, JSON.stringify(errBody));
+      return res.status(vRes.status).json({ error: 'Could not fetch vehicles', status: vRes.status, detail: errBody });
+    }
     const vData = await vRes.json();
     if (!vData.data?.length) return res.status(404).json({ error: 'No vehicles found' });
 
@@ -28,10 +32,15 @@ export default async function handler(req, res) {
       'https://api.volvocars.com/connected-vehicle/v2/vehicles/' + vin + '/trips',
       { headers: { 'Authorization': 'Bearer ' + token, 'vcc-api-key': apiKey } }
     );
-    if (!tRes.ok) return res.status(tRes.status).json({ error: 'Could not fetch trips', status: tRes.status });
-    const tData = await tRes.json();
+    if (!tRes.ok) {
+      const errBody = await tRes.json().catch(() => ({}));
+      console.log('Volvo trips error:', tRes.status, JSON.stringify(errBody));
+      return res.status(tRes.status).json({ error: 'Could not fetch trips', status: tRes.status, detail: errBody });
+    }
 
+    const tData = await tRes.json();
     res.json({ vin, model, trips: tData.data || [] });
+
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
