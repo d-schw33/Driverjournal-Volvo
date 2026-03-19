@@ -1,4 +1,4 @@
-import { getSession, saveSession, newSessionId, createSessionCookie } from '../_utils.js';
+import { getSession, saveSession, newSessionId } from '../_utils.js';
 
 export default async function handler(req, res) {
   const { code, error } = req.query;
