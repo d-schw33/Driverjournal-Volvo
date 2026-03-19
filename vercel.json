@@ -1,15 +1,15 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/auth/volvo/login",    "dest": "/api/auth/volvo-login.js" },
-    { "src": "/auth/volvo/callback", "dest": "/api/auth/volvo-callback.js" },
-    { "src": "/auth/ms/login",       "dest": "/api/auth/ms-login.js" },
-    { "src": "/auth/ms/callback",    "dest": "/api/auth/ms-callback.js" },
-    { "src": "/auth/logout",         "dest": "/api/auth/logout.js" },
-    { "src": "/api/me",              "dest": "/api/me.js" },
-    { "src": "/api/trips",           "dest": "/api/trips.js" },
-    { "src": "/api/events",          "dest": "/api/events.js" },
-    { "src": "/(.*\\.(css|js|png|ico|svg))", "dest": "/public/$1" },
-    { "src": "/(.*)",                "dest": "/public/index.html" }
+  "rewrites": [
+    { "source": "/auth/volvo/login",    "destination": "/api/auth/volvo-login" },
+    { "source": "/auth/volvo/callback", "destination": "/api/auth/volvo-callback" },
+    { "source": "/auth/ms/login",       "destination": "/api/auth/ms-login" },
+    { "source": "/auth/ms/callback",    "destination": "/api/auth/ms-callback" },
+    { "source": "/auth/logout",         "destination": "/api/auth/logout" },
+    { "source": "/data/me",             "destination": "/api/me" },
+    { "source": "/data/trips",          "destination": "/api/trips" },
+    { "source": "/data/events",         "destination": "/api/events" },
+    { "source": "/",                    "destination": "/public/index.html" },
+    { "source": "/(.*)",                "destination": "/public/$1" }
   ]
 }

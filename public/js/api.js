@@ -1,14 +1,16 @@
+// ── Loading guards to prevent infinite loops ──────────────────────────────────
+const _loading = { volvo: false, outlook: false };
+
 // ── Init: check session status on load ───────────────────────────────────────
 async function checkSession() {
   try {
-    const res  = await fetch('/api/me');
+    const res  = await fetch('/data/me');
     const data = await res.json();
 
     if (data.volvo) {
       State.volvo.connected = true;
       setVolvoConnected('Ansluten via Volvo ID');
-      // Auto-fetch trips if not already loaded
-      if (!State.volvo.trips.length) {
+      if (!State.volvo.trips.length && !_loading.volvo) {
         await fetchVolvoData();
       }
     }
@@ -16,8 +18,7 @@ async function checkSession() {
       State.outlook.connected = true;
       const label = data.msUser ? data.msUser.name + ' (' + data.msUser.email + ')' : 'Ansluten';
       setOutlookConnected(label);
-      // Auto-fetch events if not already loaded
-      if (!State.outlook.events.length) {
+      if (!State.outlook.events.length && !_loading.outlook) {
         await fetchOutlookData();
       }
     }
@@ -40,17 +41,19 @@ function startVolvoLogin() {
 }
 
 async function fetchVolvoData() {
+  if (_loading.volvo) return;
+  _loading.volvo = true;
+
   const apiKey = sessionStorage.getItem('volvo_apikey') || '';
   const vin    = sessionStorage.getItem('volvo_vin')    || '';
-
-  const btn = document.getElementById('volvo-btn');
+  const btn    = document.getElementById('volvo-btn');
   if (btn) setLoading(btn, true, 'Hämtar körjournal');
 
   try {
     const params = new URLSearchParams({ apikey: apiKey });
     if (vin) params.set('vin', vin);
 
-    const res  = await fetch('/api/trips?' + params);
+    const res  = await fetch('/data/trips?' + params);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kunde inte hämta körjournal');
 
@@ -68,6 +71,7 @@ async function fetchVolvoData() {
       showFormError('volvo-error', e.message);
     }
   } finally {
+    _loading.volvo = false;
     if (btn) setLoading(btn, false, 'Logga in med Volvo ID →');
   }
 }
@@ -109,12 +113,12 @@ function loadVolvoDemo() {
 }
 
 function setVolvoConnected(label) {
-  const form = document.getElementById('volvo-form');
-  const conn = document.getElementById('volvo-connected');
-  const info = document.getElementById('volvo-vehicle-info');
+  const form  = document.getElementById('volvo-form');
+  const conn  = document.getElementById('volvo-connected');
+  const info  = document.getElementById('volvo-vehicle-info');
   const badge = document.getElementById('volvo-status-badge');
-  const dot  = document.querySelector('#conn-volvo .conn-dot');
-  const btn  = document.querySelector('#conn-volvo .conn-btn');
+  const dot   = document.querySelector('#conn-volvo .conn-dot');
+  const btn   = document.querySelector('#conn-volvo .conn-btn');
   if (form)  form.style.display  = 'none';
   if (conn)  conn.style.display  = 'block';
   if (info)  info.textContent    = '✓  ' + label;
@@ -146,11 +150,14 @@ function startMsLogin() {
 }
 
 async function fetchOutlookData() {
+  if (_loading.outlook) return;
+  _loading.outlook = true;
+
   const btn = document.getElementById('outlook-btn');
   if (btn) setLoading(btn, true, 'Hämtar kalender');
 
   try {
-    const res  = await fetch('/api/events');
+    const res  = await fetch('/data/events');
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kunde inte hämta kalender');
 
@@ -164,6 +171,7 @@ async function fetchOutlookData() {
       showFormError('outlook-error', e.message);
     }
   } finally {
+    _loading.outlook = false;
     if (btn) setLoading(btn, false, 'Ansluten ✓');
   }
 }
