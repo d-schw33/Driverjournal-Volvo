@@ -11,6 +11,11 @@ export default async function handler(req, res) {
     return res.status(400).send('<h2>No code received</h2><p>' + JSON.stringify(req.query) + '</p><a href="/">← Tillbaka</a>');
   }
 
+  const codeVerifier = req.headers.cookie?.match(/pkce_volvo=([^;]+)/)?.[1];
+  if (!codeVerifier) {
+    return res.status(400).send('<h2>PKCE Error</h2><p>Code verifier missing – try logging in again.</p><a href="/">← Tillbaka</a>');
+  }
+
   try {
     const credentials = Buffer.from(
       process.env.VOLVO_CLIENT_ID + ':' + process.env.VOLVO_CLIENT_SECRET
@@ -23,9 +28,10 @@ export default async function handler(req, res) {
         'Authorization': 'Basic ' + credentials
       },
       body: new URLSearchParams({
-        grant_type:   'authorization_code',
+        grant_type:    'authorization_code',
         code,
-        redirect_uri: process.env.VOLVO_REDIRECT_URI
+        redirect_uri:  process.env.VOLVO_REDIRECT_URI,
+        code_verifier: codeVerifier
       }).toString()
     });
 
@@ -45,7 +51,10 @@ export default async function handler(req, res) {
     };
 
     await saveSession(sid, session);
-    res.setHeader('Set-Cookie', 'session=' + sid + '; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');
+    res.setHeader('Set-Cookie', [
+      'session=' + sid + '; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000',
+      'pkce_volvo=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+    ]);
     res.redirect('/?volvo=connected');
 
   } catch (e) {
