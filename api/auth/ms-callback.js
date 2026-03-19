@@ -4,86 +4,37 @@ export default async function handler(req, res) {
   const { code, error, error_description } = req.query;
 
   if (error) {
-    return res.status(400).send(`
-      <h2>Microsoft OAuth Error</h2>
-      <p><strong>Error:</strong> ${error}</p>
-      <p><strong>Description:</strong> ${error_description || 'none'}</p>
-      <br><a href="/">← Tillbaka</a>
-    `);
+    return res.status(400).send('<h2>Error: ' + error + '</h2><p>' + (error_description || '') + '</p><a href="/">← Tillbaka</a>');
   }
 
   if (!code) {
-    return res.status(400).send(`
-      <h2>No code received</h2>
-      <p><strong>Query:</strong> ${JSON.stringify(req.query)}</p>
-      <br><a href="/">← Tillbaka</a>
-    `);
+    return res.status(400).send('<h2>No code received</h2><a href="/">← Tillbaka</a>');
   }
 
-  // Get PKCE code verifier from cookie
   const codeVerifier = req.headers.cookie?.match(/pkce=([^;]+)/)?.[1];
   if (!codeVerifier) {
-    return res.status(400).send(`
-      <h2>PKCE Error</h2>
-      <p>Code verifier missing – try logging in again.</p>
-      <br><a href="/">← Tillbaka</a>
-    `);
+    return res.status(400).send('<h2>PKCE Error: code verifier missing</h2><a href="/">← Tillbaka</a>');
   }
 
-  const tenantId = process.env.MS_TENANT_ID || 'common';
-
   try {
-    const bodyParams = new URLSearchParams({
-      grant_type:     'authorization_code',
-      code,
-      redirect_uri:   process.env.MS_REDIRECT_URI,
-      client_id:      process.env.MS_CLIENT_ID,
-      client_secret:  process.env.MS_CLIENT_SECRET,
-      scope:          'Calendars.Read User.Read offline_access',
-      code_verifier:  codeVerifier
-    });
-
-    const tokenRes = await fetch(`https://login.microsoftonline.com/${process.env.MS_TENANT_ID}/oauth2/v2.0/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: bodyParams.toString()
-    });
-
-    const data = await tokenRes.json();
-
-    if (!tokenRes.ok) {
-      return res.status(400).send(`
-        <h2>Token Exchange Error (${tokenRes.status})</h2>
-        <p><strong>Error:</strong> ${data.error}</p>
-        <p><strong>Description:</strong> ${data.error_description}</p>
-        <p><strong>Sent client_id:</strong> ${process.env.MS_CLIENT_ID}</p>
-        <p><strong>Sent redirect_uri:</strong> ${process.env.MS_REDIRECT_URI}</p>
-        <p><strong>Sent tenant:</strong> ${process.env.MS_TENANT_ID}</p>
-        <br><a href="/">← Tillbaka</a>
-      `);
-    
-
-    const tokenRes = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    const tokenRes = await fetch('https://login.microsoftonline.com/' + process.env.MS_TENANT_ID + '/oauth2/v2.0/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type:     'authorization_code',
-        code,
-        redirect_uri:   process.env.MS_REDIRECT_URI,
-        client_id:      process.env.MS_CLIENT_ID,
-        scope:          'Calendars.Read User.Read offline_access',
-        code_verifier:  codeVerifier
+        grant_type:    'authorization_code',
+        code:          code,
+        redirect_uri:  process.env.MS_REDIRECT_URI,
+        client_id:     process.env.MS_CLIENT_ID,
+        client_secret: process.env.MS_CLIENT_SECRET,
+        scope:         'Calendars.Read User.Read offline_access',
+        code_verifier: codeVerifier
       }).toString()
     });
 
     const data = await tokenRes.json();
+
     if (!tokenRes.ok) {
-      return res.status(400).send(`
-        <h2>Token Exchange Error</h2>
-        <p><strong>Error:</strong> ${data.error}</p>
-        <p><strong>Description:</strong> ${data.error_description}</p>
-        <br><a href="/">← Tillbaka</a>
-      `);
+      return res.status(400).send('<h2>Token Error: ' + data.error + '</h2><p>' + data.error_description + '</p><a href="/">← Tillbaka</a>');
     }
 
     const meRes = await fetch('https://graph.microsoft.com/v1.0/me', {
@@ -92,7 +43,7 @@ export default async function handler(req, res) {
     const me = meRes.ok ? await meRes.json() : {};
 
     let session = await getSession(req) || {};
-    const sid   = req.headers.cookie?.match(/session=([^;]+)/)?.[1] || newSessionId();
+    const sid = req.headers.cookie?.match(/session=([^;]+)/)?.[1] || newSessionId();
 
     session.ms = {
       accessToken:  data.access_token,
@@ -104,16 +55,12 @@ export default async function handler(req, res) {
 
     await saveSession(sid, session);
     res.setHeader('Set-Cookie', [
-      `session=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`,
-      `pkce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+      'session=' + sid + '; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000',
+      'pkce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
     ]);
     res.redirect('/?ms=connected');
 
   } catch (e) {
-    res.status(500).send(`
-      <h2>Server Error</h2>
-      <p>${e.message}</p>
-      <br><a href="/">← Tillbaka</a>
-    `);
+    res.status(500).send('<h2>Server Error</h2><p>' + e.message + '</p><a href="/">← Tillbaka</a>');
   }
 }
