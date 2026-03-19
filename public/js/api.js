@@ -44,16 +44,16 @@ async function fetchVolvoData() {
   if (_loading.volvo) return;
   _loading.volvo = true;
 
-  const apiKey = sessionStorage.getItem('volvo_apikey') || '';
-  const vin    = sessionStorage.getItem('volvo_vin')    || '';
-  const btn    = document.getElementById('volvo-btn');
+  const vin = sessionStorage.getItem('volvo_vin') || '';
+  const btn = document.getElementById('volvo-btn');
   if (btn) setLoading(btn, true, 'Hämtar körjournal');
 
   try {
-    const params = new URLSearchParams({ apikey: apiKey });
+    const params = new URLSearchParams();
     if (vin) params.set('vin', vin);
+    const query = params.toString() ? '?' + params : '';
 
-    const res  = await fetch('/api/trips?' + params);
+    const res  = await fetch('/api/trips' + query);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kunde inte hämta körjournal');
 
