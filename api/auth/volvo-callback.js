@@ -1,9 +1,15 @@
 import { getSession, saveSession, newSessionId } from '../_utils.js';
 
 export default async function handler(req, res) {
-  const { code, error } = req.query;
-  if (error) return res.redirect('/?error=' + encodeURIComponent(error));
-  if (!code)  return res.redirect('/?error=no_code');
+  const { code, error, error_description } = req.query;
+
+  if (error) {
+    return res.status(400).send('<h2>Volvo OAuth Error</h2><p>' + error + '</p><p>' + (error_description || '') + '</p><a href="/">← Tillbaka</a>');
+  }
+
+  if (!code) {
+    return res.status(400).send('<h2>No code received</h2><p>' + JSON.stringify(req.query) + '</p><a href="/">← Tillbaka</a>');
+  }
 
   try {
     const credentials = Buffer.from(
@@ -24,11 +30,11 @@ export default async function handler(req, res) {
     });
 
     const data = await tokenRes.json();
+
     if (!tokenRes.ok) {
-      return res.redirect('/?error=' + encodeURIComponent(data.error_description || 'volvo_token_failed'));
+      return res.status(400).send('<h2>Token Error</h2><p>' + data.error + '</p><p>' + (data.error_description || '') + '</p><p>redirect_uri: ' + process.env.VOLVO_REDIRECT_URI + '</p><a href="/">← Tillbaka</a>');
     }
 
-    // Get or create session
     let session = await getSession(req) || {};
     const sid   = req.headers.cookie?.match(/session=([^;]+)/)?.[1] || newSessionId();
 
@@ -39,10 +45,10 @@ export default async function handler(req, res) {
     };
 
     await saveSession(sid, session);
-    res.setHeader('Set-Cookie', `session=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`);
+    res.setHeader('Set-Cookie', 'session=' + sid + '; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');
     res.redirect('/?volvo=connected');
 
   } catch (e) {
-    res.redirect('/?error=' + encodeURIComponent(e.message));
+    res.status(500).send('<h2>Server Error</h2><p>' + e.message + '</p><a href="/">← Tillbaka</a>');
   }
 }
