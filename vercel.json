@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "routes": [
+    { "src": "/auth/volvo/login",    "dest": "/api/auth/volvo-login.js" },
+    { "src": "/auth/volvo/callback", "dest": "/api/auth/volvo-callback.js" },
+    { "src": "/auth/ms/login",       "dest": "/api/auth/ms-login.js" },
+    { "src": "/auth/ms/callback",    "dest": "/api/auth/ms-callback.js" },
+    { "src": "/auth/logout",         "dest": "/api/auth/logout.js" },
+    { "src": "/api/me",              "dest": "/api/me.js" },
+    { "src": "/api/trips",           "dest": "/api/trips.js" },
+    { "src": "/api/events",          "dest": "/api/events.js" },
+    { "src": "/(.*\\.(css|js|png|ico|svg|woff|woff2))", "dest": "/public/$1" },
+    { "src": "/(.*)",                "dest": "/public/index.html" }
+  ]
+}
