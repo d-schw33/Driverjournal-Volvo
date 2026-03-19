@@ -1,21 +1,5 @@
 // ── Init: check session status on load ───────────────────────────────────────
 async function checkSession() {
-  // Check for redirect params
-  const params = new URLSearchParams(window.location.search);
-  window.history.replaceState({}, document.title, '/');
-
-  if (params.get('error')) {
-    const view = document.getElementById('view-connect');
-    if (view) {
-      const err = document.createElement('div');
-      err.className = 'alert-error';
-      err.style.cssText = 'background:#FCEBEB;color:#791F1F;border:0.5px solid #F7C1C1;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:1rem;';
-      err.textContent = 'Inloggning misslyckades: ' + decodeURIComponent(params.get('error'));
-      view.querySelector('.view-header').after(err);
-      setTimeout(() => err.remove(), 8000);
-    }
-  }
-
   try {
     const res  = await fetch('/api/me');
     const data = await res.json();
@@ -23,15 +7,21 @@ async function checkSession() {
     if (data.volvo) {
       State.volvo.connected = true;
       setVolvoConnected('Ansluten via Volvo ID');
+      // Auto-fetch trips if not already loaded
+      if (!State.volvo.trips.length) {
+        await fetchVolvoData();
+      }
     }
     if (data.ms) {
       State.outlook.connected = true;
       const label = data.msUser ? data.msUser.name + ' (' + data.msUser.email + ')' : 'Ansluten';
       setOutlookConnected(label);
+      // Auto-fetch events if not already loaded
+      if (!State.outlook.events.length) {
+        await fetchOutlookData();
+      }
     }
-    if (data.volvo && data.ms) {
-      checkBothConnected();
-    }
+    checkBothConnected();
   } catch (e) {
     console.error('Session check failed:', e);
   }
@@ -54,7 +44,7 @@ async function fetchVolvoData() {
   const vin    = sessionStorage.getItem('volvo_vin')    || '';
 
   const btn = document.getElementById('volvo-btn');
-  setLoading(btn, true, 'Hämtar körjournal');
+  if (btn) setLoading(btn, true, 'Hämtar körjournal');
 
   try {
     const params = new URLSearchParams({ apikey: apiKey });
@@ -69,13 +59,16 @@ async function fetchVolvoData() {
     State.volvo.vin         = data.vin;
     State.volvo.connected   = true;
 
-    setVolvoConnected(data.model + ' · ' + data.vin);
+    setVolvoConnected((data.model || '') + (data.vin ? ' · ' + data.vin : ''));
     checkBothConnected();
 
   } catch (e) {
-    showFormError('volvo-error', e.message);
+    console.error('fetchVolvoData error:', e);
+    if (document.getElementById('volvo-error')) {
+      showFormError('volvo-error', e.message);
+    }
   } finally {
-    setLoading(btn, false, 'Logga in med Volvo ID →');
+    if (btn) setLoading(btn, false, 'Logga in med Volvo ID →');
   }
 }
 
@@ -116,27 +109,34 @@ function loadVolvoDemo() {
 }
 
 function setVolvoConnected(label) {
-  document.getElementById('volvo-form').style.display      = 'none';
-  document.getElementById('volvo-connected').style.display = 'block';
-  document.getElementById('volvo-vehicle-info').textContent = '✓  ' + label;
-  document.getElementById('volvo-status-badge').textContent = 'Ansluten';
-  document.getElementById('volvo-status-badge').classList.add('connected');
-  document.querySelector('#conn-volvo .conn-dot').classList.replace('disconnected', 'connected');
-  document.querySelector('#conn-volvo .conn-btn').textContent = '✓';
-  document.querySelector('#conn-volvo .conn-btn').disabled = true;
+  const form = document.getElementById('volvo-form');
+  const conn = document.getElementById('volvo-connected');
+  const info = document.getElementById('volvo-vehicle-info');
+  const badge = document.getElementById('volvo-status-badge');
+  const dot  = document.querySelector('#conn-volvo .conn-dot');
+  const btn  = document.querySelector('#conn-volvo .conn-btn');
+  if (form)  form.style.display  = 'none';
+  if (conn)  conn.style.display  = 'block';
+  if (info)  info.textContent    = '✓  ' + label;
+  if (badge) { badge.textContent = 'Ansluten'; badge.classList.add('connected'); }
+  if (dot)   dot.classList.replace('disconnected', 'connected');
+  if (btn)   { btn.textContent = '✓'; btn.disabled = true; }
 }
 
 function disconnectVolvo() {
   State.volvo.connected = false;
   State.volvo.trips     = [];
   fetch('/auth/logout');
-  document.getElementById('volvo-form').style.display      = 'block';
-  document.getElementById('volvo-connected').style.display = 'none';
-  document.getElementById('volvo-status-badge').textContent = 'Ej ansluten';
-  document.getElementById('volvo-status-badge').classList.remove('connected');
-  document.querySelector('#conn-volvo .conn-dot').classList.replace('connected', 'disconnected');
-  document.querySelector('#conn-volvo .conn-btn').textContent = 'Anslut';
-  document.querySelector('#conn-volvo .conn-btn').disabled = false;
+  const form  = document.getElementById('volvo-form');
+  const conn  = document.getElementById('volvo-connected');
+  const badge = document.getElementById('volvo-status-badge');
+  const dot   = document.querySelector('#conn-volvo .conn-dot');
+  const btn   = document.querySelector('#conn-volvo .conn-btn');
+  if (form)  form.style.display  = 'block';
+  if (conn)  conn.style.display  = 'none';
+  if (badge) { badge.textContent = 'Ej ansluten'; badge.classList.remove('connected'); }
+  if (dot)   dot.classList.replace('connected', 'disconnected');
+  if (btn)   { btn.textContent = 'Anslut'; btn.disabled = false; }
   document.getElementById('analyze-bar').style.display = 'none';
 }
 
@@ -147,7 +147,7 @@ function startMsLogin() {
 
 async function fetchOutlookData() {
   const btn = document.getElementById('outlook-btn');
-  setLoading(btn, true, 'Hämtar kalender');
+  if (btn) setLoading(btn, true, 'Hämtar kalender');
 
   try {
     const res  = await fetch('/api/events');
@@ -159,9 +159,12 @@ async function fetchOutlookData() {
     checkBothConnected();
 
   } catch (e) {
-    showFormError('outlook-error', e.message);
+    console.error('fetchOutlookData error:', e);
+    if (document.getElementById('outlook-error')) {
+      showFormError('outlook-error', e.message);
+    }
   } finally {
-    setLoading(btn, false, 'Ansluten ✓');
+    if (btn) setLoading(btn, false, 'Ansluten ✓');
   }
 }
 
@@ -198,26 +201,33 @@ function loadOutlookDemo() {
 }
 
 function setOutlookConnected(label) {
-  document.getElementById('outlook-form').style.display      = 'none';
-  document.getElementById('outlook-connected').style.display = 'block';
-  document.getElementById('outlook-user-info').textContent   = '✓  ' + label;
-  document.getElementById('outlook-status-badge').textContent = 'Ansluten';
-  document.getElementById('outlook-status-badge').classList.add('connected');
-  document.querySelector('#conn-outlook .conn-dot').classList.replace('disconnected', 'connected');
-  document.querySelector('#conn-outlook .conn-btn').textContent = '✓';
-  document.querySelector('#conn-outlook .conn-btn').disabled = true;
+  const form  = document.getElementById('outlook-form');
+  const conn  = document.getElementById('outlook-connected');
+  const info  = document.getElementById('outlook-user-info');
+  const badge = document.getElementById('outlook-status-badge');
+  const dot   = document.querySelector('#conn-outlook .conn-dot');
+  const btn   = document.querySelector('#conn-outlook .conn-btn');
+  if (form)  form.style.display  = 'none';
+  if (conn)  conn.style.display  = 'block';
+  if (info)  info.textContent    = '✓  ' + label;
+  if (badge) { badge.textContent = 'Ansluten'; badge.classList.add('connected'); }
+  if (dot)   dot.classList.replace('disconnected', 'connected');
+  if (btn)   { btn.textContent = '✓'; btn.disabled = true; }
 }
 
 function disconnectOutlook() {
   State.outlook.connected = false;
   State.outlook.events    = [];
-  document.getElementById('outlook-form').style.display      = 'block';
-  document.getElementById('outlook-connected').style.display = 'none';
-  document.getElementById('outlook-status-badge').textContent = 'Ej ansluten';
-  document.getElementById('outlook-status-badge').classList.remove('connected');
-  document.querySelector('#conn-outlook .conn-dot').classList.replace('connected', 'disconnected');
-  document.querySelector('#conn-outlook .conn-btn').textContent = 'Anslut';
-  document.querySelector('#conn-outlook .conn-btn').disabled = false;
+  const form  = document.getElementById('outlook-form');
+  const conn  = document.getElementById('outlook-connected');
+  const badge = document.getElementById('outlook-status-badge');
+  const dot   = document.querySelector('#conn-outlook .conn-dot');
+  const btn   = document.querySelector('#conn-outlook .conn-btn');
+  if (form)  form.style.display  = 'block';
+  if (conn)  conn.style.display  = 'none';
+  if (badge) { badge.textContent = 'Ej ansluten'; badge.classList.remove('connected'); }
+  if (dot)   dot.classList.replace('connected', 'disconnected');
+  if (btn)   { btn.textContent = 'Anslut'; btn.disabled = false; }
   document.getElementById('analyze-bar').style.display = 'none';
 }
 
@@ -237,6 +247,7 @@ function setLoading(btn, on, label) {
 
 function showFormError(id, msg) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.textContent = msg;
   el.classList.add('visible');
   setTimeout(() => el.classList.remove('visible'), 8000);

@@ -12,21 +12,27 @@ function showView(name) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Read URL params BEFORE anything else
+  const params     = new URLSearchParams(window.location.search);
+  const errorParam = params.get('error');
+  window.history.replaceState({}, document.title, '/');
+
   showView('connect');
 
-  // Check existing session
+  // Show error if redirected with error
+  if (errorParam) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'background:#FCEBEB;color:#791F1F;border:0.5px solid #F7C1C1;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:1rem;';
+    errEl.textContent = 'Inloggning misslyckades: ' + decodeURIComponent(errorParam);
+    const header = document.querySelector('#view-connect .view-header');
+    if (header) header.after(errEl);
+    setTimeout(() => errEl.remove(), 8000);
+  }
+
+  // Check session – this will also auto-fetch data if connected
   await checkSession();
 
-  // If volvo just connected via OAuth, fetch data automatically
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('volvo') === 'connected' && State.volvo.connected) {
-    await fetchVolvoData();
-  }
-  if (params.get('ms') === 'connected' && State.outlook.connected) {
-    await fetchOutlookData();
-  }
-
-  // Settings button
+  // Settings button in sidebar
   const sidebar     = document.querySelector('.sidebar');
   const settingsBtn = document.createElement('button');
   settingsBtn.className = 'nav-item';
