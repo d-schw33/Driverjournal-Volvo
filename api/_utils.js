@@ -1,15 +1,26 @@
-import { createClient } from '@libsql/client';
+// Uses Turso HTTP API directly instead of @libsql/client
 
-function getDb() {
-  return createClient({
-    url:       process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN
+async function tursoQuery(sql, args = []) {
+  const url = process.env.TURSO_DATABASE_URL.replace('libsql://', 'https://');
+  const res = await fetch(url + '/v2/pipeline', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + process.env.TURSO_AUTH_TOKEN,
+      'Content-Type':  'application/json'
+    },
+    body: JSON.stringify({
+      requests: [
+        { type: 'execute', stmt: { sql, args: args.map(a => ({ type: 'text', value: String(a) })) } },
+        { type: 'close' }
+      ]
+    })
   });
+  if (!res.ok) throw new Error('Turso error: ' + res.status + ' ' + await res.text());
+  return await res.json();
 }
 
-// ── Init DB (creates table if not exists) ────────────────────────────────────
-async function initDb(db) {
-  await db.execute(`
+async function initDb() {
+  await tursoQuery(`
     CREATE TABLE IF NOT EXISTS sessions (
       id         TEXT PRIMARY KEY,
       data       TEXT NOT NULL,
@@ -18,7 +29,6 @@ async function initDb(db) {
   `);
 }
 
-// ── Session helpers ───────────────────────────────────────────────────────────
 export function getSessionId(req) {
   const cookie = req.headers.cookie || '';
   const match  = cookie.match(/session=([^;]+)/);
@@ -28,50 +38,56 @@ export function getSessionId(req) {
 export function newSessionId() {
   const arr = new Uint8Array(32);
   crypto.getRandomValues(arr);
-  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
-export function createSessionCookie(sid) {
-  return `session=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`;
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function clearSessionCookie() {
-  return `session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  return 'session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
 }
 
 export async function getSession(req) {
   const sid = getSessionId(req);
   if (!sid) return null;
-  const db = getDb();
-  await initDb(db);
-  const now = Date.now();
-  const res = await db.execute({
-    sql:  'SELECT data FROM sessions WHERE id = ? AND expires_at > ?',
-    args: [sid, now]
-  });
-  if (!res.rows.length) return null;
-  return JSON.parse(res.rows[0].data);
+  try {
+    await initDb();
+    const now = Date.now();
+    const result = await tursoQuery(
+      'SELECT data FROM sessions WHERE id = ? AND expires_at > ?',
+      [sid, now]
+    );
+    const rows = result.results?.[0]?.response?.result?.rows || [];
+    if (!rows.length) return null;
+    return JSON.parse(rows[0][0].value);
+  } catch (e) {
+    console.error('getSession error:', e.message);
+    return null;
+  }
 }
 
 export async function saveSession(sid, data, ttlSeconds = 2592000) {
-  const db        = getDb();
-  await initDb(db);
-  const expiresAt = Date.now() + ttlSeconds * 1000;
-  await db.execute({
-    sql:  'INSERT OR REPLACE INTO sessions (id, data, expires_at) VALUES (?, ?, ?)',
-    args: [sid, JSON.stringify(data), expiresAt]
-  });
+  try {
+    await initDb();
+    const expiresAt = Date.now() + ttlSeconds * 1000;
+    await tursoQuery(
+      'INSERT OR REPLACE INTO sessions (id, data, expires_at) VALUES (?, ?, ?)',
+      [sid, JSON.stringify(data), expiresAt]
+    );
+  } catch (e) {
+    console.error('saveSession error:', e.message);
+  }
 }
 
 export async function deleteSession(req) {
   const sid = getSessionId(req);
   if (!sid) return;
-  const db = getDb();
-  await initDb(db);
-  await db.execute({ sql: 'DELETE FROM sessions WHERE id = ?', args: [sid] });
+  try {
+    await initDb();
+    await tursoQuery('DELETE FROM sessions WHERE id = ?', [sid]);
+  } catch (e) {
+    console.error('deleteSession error:', e.message);
+  }
 }
 
-// ── Volvo token refresh ───────────────────────────────────────────────────────
 export async function getValidVolvoToken(session) {
   const now = Date.now();
   if (session.volvo?.accessToken && session.volvo.expiresAt > now + 60000) {
@@ -97,15 +113,12 @@ export async function getValidVolvoToken(session) {
 
   if (!res.ok) return null;
   const data = await res.json();
-
   session.volvo.accessToken  = data.access_token;
   session.volvo.refreshToken = data.refresh_token || session.volvo.refreshToken;
   session.volvo.expiresAt    = now + (data.expires_in || 1800) * 1000;
-
   return data.access_token;
 }
 
-// ── Microsoft token refresh ───────────────────────────────────────────────────
 export async function getValidMsToken(session) {
   const now = Date.now();
   if (session.ms?.accessToken && session.ms.expiresAt > now + 60000) {
@@ -113,7 +126,7 @@ export async function getValidMsToken(session) {
   }
   if (!session.ms?.refreshToken) return null;
 
-  const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+  const res = await fetch('https://login.microsoftonline.com/' + process.env.MS_TENANT_ID + '/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -127,10 +140,8 @@ export async function getValidMsToken(session) {
 
   if (!res.ok) return null;
   const data = await res.json();
-
   session.ms.accessToken  = data.access_token;
   session.ms.refreshToken = data.refresh_token || session.ms.refreshToken;
   session.ms.expiresAt    = now + (data.expires_in || 3600) * 1000;
-
   return data.access_token;
 }
