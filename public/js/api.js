@@ -4,7 +4,7 @@ const _loading = { volvo: false, outlook: false };
 // ── Init: check session status on load ───────────────────────────────────────
 async function checkSession() {
   try {
-    const res  = await fetch('/data/me');
+    const res  = await fetch('/api/me');
     const data = await res.json();
 
     if (data.volvo) {
@@ -53,7 +53,7 @@ async function fetchVolvoData() {
     const params = new URLSearchParams({ apikey: apiKey });
     if (vin) params.set('vin', vin);
 
-    const res  = await fetch('/data/trips?' + params);
+    const res  = await fetch('/api/trips?' + params);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kunde inte hämta körjournal');
 
@@ -157,7 +157,7 @@ async function fetchOutlookData() {
   if (btn) setLoading(btn, true, 'Hämtar kalender');
 
   try {
-    const res  = await fetch('/data/events');
+    const res  = await fetch('/api/events');
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Kunde inte hämta kalender');
 
