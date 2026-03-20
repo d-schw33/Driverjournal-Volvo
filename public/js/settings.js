@@ -54,7 +54,7 @@ function openSettings() {
   const s = State.settings;
   document.getElementById('setting-car-type').value    = s.carType    || 'company';
   document.getElementById('setting-tax-private').value = s.taxPrivate || 3.5;
-  document.getElementById('setting-electric-rate').value = s.electricRate || 9.5;
+  document.getElementById('setting-electric-rate').value = s.electricRate || 0.95;
   document.getElementById('setting-private-rate').value  = s.privateRate  || 2.5;
   updateSettingsUI(s.carType || 'company');
   document.getElementById('settings-modal').style.display = 'flex';
@@ -70,7 +70,7 @@ async function saveSettings() {
   const carType = document.getElementById('setting-car-type').value;
   State.settings.carType      = carType;
   State.settings.taxPrivate   = parseFloat(document.getElementById('setting-tax-private').value)   || 3.5;
-  State.settings.electricRate = parseFloat(document.getElementById('setting-electric-rate').value) || 9.5;
+  State.settings.electricRate = parseFloat(document.getElementById('setting-electric-rate').value) || 0.95;
   State.settings.privateRate  = parseFloat(document.getElementById('setting-private-rate').value)  || 2.5;
   applyCarTypeRates();
   await saveSettingsToServer();
