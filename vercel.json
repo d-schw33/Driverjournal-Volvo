@@ -10,7 +10,7 @@
     { "src": "/api/trips",           "dest": "/api/trips.js" },
     { "src": "/api/events",          "dest": "/api/events.js" },
     { "src": "/(.*\\.(css|js|png|ico|svg|woff|woff2))", "dest": "/public/$1" },
-    { "src": "/(.*)",                "dest": "/public/index.html" }
+    { "src": "/(.*)",                "dest": "/public/index.html" },
 	{ "src": "/api/settings", "dest": "/api/settings.js" }
   ]
 }
