@@ -1,4 +1,4 @@
-// ─── Match trips against calendar events + location history ──────────────────
+// ─── Match trips against calendar events ─────────────────────────────────────
 
 function analyzeAndMatch() {
   if (!State.volvo.trips.length)    return;
@@ -21,7 +21,6 @@ function classifyTrip(trip) {
   const tripDate  = trip.date;
   const tripStart = toMinutes(trip.startTime);
   const tripEnd   = toMinutes(trip.endTime);
-  const tripHour  = parseInt(trip.startTime.split(':')[0]);
 
   // ── Driver verification via GPX ───────────────────────────────────────────
   let driverVerified = null;
@@ -33,48 +32,68 @@ function classifyTrip(trip) {
   const sameDay = State.outlook.events.filter(e => e.date === tripDate);
 
   if (sameDay.length) {
-    // Work events with time overlap (± 60 min buffer)
-    const workOverlap = sameDay.filter(e => {
-      if (!e.isWork || e.isOnline) return false;
+
+    // 1. Exakt platsmatching – resans start/destination mot händelsens plats
+    const locationMatch = sameDay.find(e => {
+      if (!e.location || e.location.toLowerCase().includes('teams') || e.location.toLowerCase().includes('zoom')) return false;
+      const evLoc    = normalizePlace(e.location);
+      const tripDest = normalizePlace(trip.end);
+      const tripSrc  = normalizePlace(trip.start);
+      return evLoc && (tripDest.includes(evLoc) || evLoc.includes(tripDest) ||
+                       tripSrc.includes(evLoc)  || evLoc.includes(tripSrc));
+    });
+    if (locationMatch) {
+      return { type: locationMatch.isWork ? 'work' : 'private', event: locationMatch, driverVerified };
+    }
+
+    // 2. Privata kategorier → privat resa
+    const privateEvent = sameDay.find(e => !e.isWork);
+    const workEvents   = sameDay.filter(e => e.isWork);
+
+    // 3. Tidsmässig överlapp med arbetshändelse
+    const workOverlap = workEvents.filter(e => {
+      if (e.isOnline) return false;
       const evStart = toMinutes(e.startTime);
       const evEnd   = toMinutes(e.endTime);
-      return tripStart <= evEnd + 60 && tripEnd >= evStart - 60;
+      // Resa startar under eller strax efter händelsen (90 min buffer för resa till/från)
+      return tripStart <= evEnd + 90 && tripEnd >= evStart - 90;
     });
     if (workOverlap.length) return { type: 'work', event: workOverlap[0], driverVerified };
 
-    // Work event same day but only during working hours (06-19)
-    const workSameDay = sameDay.filter(e => e.isWork && !e.isOnline);
-    if (workSameDay.length && tripHour >= 6 && tripHour < 19) {
-      return { type: 'work', event: workSameDay[0], driverVerified };
-    }
-
-    // Only private events → private
-    const privateSameDay = sameDay.filter(e => !e.isWork);
-    if (privateSameDay.length && !workSameDay.length) {
-      return { type: 'private', event: privateSameDay[0], driverVerified };
-    }
+    // 4. Ingen matchning – okänd
+    return { type: 'unknown', event: null, driverVerified };
   }
 
-  // ── Adjacent days (travel to/from event) ──────────────────────────────────
+  // ── Angränsande dagar med platsmatching ───────────────────────────────────
   const prev = offsetDate(tripDate, -1);
   const next = offsetDate(tripDate,  1);
-  const adjacentWork = State.outlook.events.find(e =>
-    (e.date === prev || e.date === next) && e.isWork && !e.isOnline
-  );
-  if (adjacentWork && tripHour >= 6 && tripHour < 19) {
-    return { type: 'work', event: adjacentWork, driverVerified };
+
+  const adjacentLocationMatch = State.outlook.events.find(e => {
+    if (e.date !== prev && e.date !== next) return false;
+    if (!e.location || e.location.toLowerCase().includes('teams')) return false;
+    const evLoc    = normalizePlace(e.location);
+    const tripDest = normalizePlace(trip.end);
+    return evLoc && (tripDest.includes(evLoc) || evLoc.includes(tripDest));
+  });
+  if (adjacentLocationMatch) {
+    return { type: adjacentLocationMatch.isWork ? 'work' : 'private', event: adjacentLocationMatch, driverVerified };
   }
 
-  // ── Location matching ─────────────────────────────────────────────────────
-  const destWords = trip.end.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
-  const locMatch  = State.outlook.events.find(e => {
-    if (!e.location) return false;
-    const loc = e.location.toLowerCase();
-    return destWords.some(w => loc.includes(w));
-  });
-  if (locMatch) return { type: locMatch.isWork ? 'work' : 'private', event: locMatch, driverVerified };
-
   return { type: 'unknown', event: null, driverVerified };
+}
+
+// ── Normalisera platsnamn för matchning ───────────────────────────────────────
+function normalizePlace(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/\d+/g, '')           // Ta bort gatunummer
+    .replace(/[,\-\/]/g, ' ')     // Ersätt skiljetecken med mellanslag
+    .replace(/\s+/g, ' ')         // Normalisera mellanslag
+    .trim()
+    .split(' ')
+    .filter(w => w.length > 3)    // Bara ord längre än 3 tecken
+    .join(' ');
 }
 
 function toMinutes(timeStr) {
