@@ -1,7 +1,7 @@
 // ─── Match trips against calendar events + location history ──────────────────
 
 function analyzeAndMatch() {
-  if (!State.volvo.trips.length)   return;
+  if (!State.volvo.trips.length)    return;
   if (!State.outlook.events.length) return;
 
   State.volvo.trips = State.volvo.trips.map(trip => {
@@ -21,50 +21,51 @@ function classifyTrip(trip) {
   const tripDate  = trip.date;
   const tripStart = toMinutes(trip.startTime);
   const tripEnd   = toMinutes(trip.endTime);
+  const tripHour  = parseInt(trip.startTime.split(':')[0]);
 
-  // ── Check driver via location history ─────────────────────────────────────
+  // ── Driver verification via GPX ───────────────────────────────────────────
   let driverVerified = null;
-if (typeof locationHistory !== 'undefined' && locationHistory && locationHistory.length) {
-    // Convert trip start to timestamp
-    const tripTs = new Date(trip.date + 'T' + trip.startTime + ':00').getTime();
-    // Check if user was near start location at trip time (rough coords from address not available,
-    // so we check if user was moving/active at that time at all)
-    const tripTsEnd = new Date(trip.date + 'T' + trip.endTime + ':00').getTime();
-    const userActiveAtTripTime = locationHistory.some(p => {
-      return p.ts >= tripTs - 30*60*1000 && p.ts <= tripTsEnd + 30*60*1000;
-    });
-    driverVerified = userActiveAtTripTime ? 'likely-you' : 'possibly-other';
+  if (typeof gpxTracks !== 'undefined' && gpxTracks.length) {
+    driverVerified = verifyDriver(trip);
   }
 
-  // ── Same-day calendar matching ─────────────────────────────────────────────
+  // ── Same-day events ───────────────────────────────────────────────────────
   const sameDay = State.outlook.events.filter(e => e.date === tripDate);
 
   if (sameDay.length) {
+    // Work events with time overlap (± 60 min buffer)
     const workOverlap = sameDay.filter(e => {
-      if (!e.isWork) return false;
-      if (e.isOnline) return false;
+      if (!e.isWork || e.isOnline) return false;
       const evStart = toMinutes(e.startTime);
       const evEnd   = toMinutes(e.endTime);
-      return tripStart <= evEnd + 120 && tripEnd >= evStart - 120;
+      return tripStart <= evEnd + 60 && tripEnd >= evStart - 60;
     });
     if (workOverlap.length) return { type: 'work', event: workOverlap[0], driverVerified };
 
+    // Work event same day but only during working hours (06-19)
     const workSameDay = sameDay.filter(e => e.isWork && !e.isOnline);
-    if (workSameDay.length) return { type: 'work', event: workSameDay[0], driverVerified };
+    if (workSameDay.length && tripHour >= 6 && tripHour < 19) {
+      return { type: 'work', event: workSameDay[0], driverVerified };
+    }
 
+    // Only private events → private
     const privateSameDay = sameDay.filter(e => !e.isWork);
-    if (privateSameDay.length && !workSameDay.length) return { type: 'private', event: privateSameDay[0], driverVerified };
+    if (privateSameDay.length && !workSameDay.length) {
+      return { type: 'private', event: privateSameDay[0], driverVerified };
+    }
   }
 
-  // ── Adjacent days ──────────────────────────────────────────────────────────
+  // ── Adjacent days (travel to/from event) ──────────────────────────────────
   const prev = offsetDate(tripDate, -1);
   const next = offsetDate(tripDate,  1);
   const adjacentWork = State.outlook.events.find(e =>
     (e.date === prev || e.date === next) && e.isWork && !e.isOnline
   );
-  if (adjacentWork) return { type: 'work', event: adjacentWork, driverVerified };
+  if (adjacentWork && tripHour >= 6 && tripHour < 19) {
+    return { type: 'work', event: adjacentWork, driverVerified };
+  }
 
-  // ── Location matching ──────────────────────────────────────────────────────
+  // ── Location matching ─────────────────────────────────────────────────────
   const destWords = trip.end.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
   const locMatch  = State.outlook.events.find(e => {
     if (!e.location) return false;

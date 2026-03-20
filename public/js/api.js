@@ -1,11 +1,12 @@
-// ── Loading guards to prevent infinite loops ──────────────────────────────────
-const _loading = { volvo: false, outlook: false };
+// ── Loading guards to prevent multiple calls ──────────────────────────────────
+const _loading  = { volvo: false, outlook: false };
+let _sessionChecked = false;
 
 // ── Init: check session status on load ───────────────────────────────────────
-let _sessionChecked = false;
 async function checkSession() {
   if (_sessionChecked) return;
   _sessionChecked = true;
+
   try {
     const res  = await fetch('/api/me');
     const data = await res.json();
@@ -13,17 +14,13 @@ async function checkSession() {
     if (data.volvo) {
       State.volvo.connected = true;
       setVolvoConnected('Ansluten via Volvo ID');
-      if (!State.volvo.trips.length && !_loading.volvo) {
-        await fetchVolvoData();
-      }
+      if (!State.volvo.trips.length) await fetchVolvoData();
     }
     if (data.ms) {
       State.outlook.connected = true;
       const label = data.msUser ? data.msUser.name + ' (' + data.msUser.email + ')' : 'Ansluten';
       setOutlookConnected(label);
-      if (!State.outlook.events.length && !_loading.outlook) {
-        await fetchOutlookData();
-      }
+      if (!State.outlook.events.length) await fetchOutlookData();
     }
     checkBothConnected();
   } catch (e) {
@@ -67,12 +64,9 @@ async function fetchVolvoData() {
 
     setVolvoConnected((data.model || '') + (data.vin ? ' · ' + data.vin : ''));
     checkBothConnected();
-
   } catch (e) {
     console.error('fetchVolvoData error:', e);
-    if (document.getElementById('volvo-error')) {
-      showFormError('volvo-error', e.message);
-    }
+    if (document.getElementById('volvo-error')) showFormError('volvo-error', e.message);
   } finally {
     _loading.volvo = false;
     if (btn) setLoading(btn, false, 'Logga in med Volvo ID →');
@@ -167,12 +161,9 @@ async function fetchOutlookData() {
     State.outlook.events    = parseOutlookEvents(data.events);
     State.outlook.connected = true;
     checkBothConnected();
-
   } catch (e) {
     console.error('fetchOutlookData error:', e);
-    if (document.getElementById('outlook-error')) {
-      showFormError('outlook-error', e.message);
-    }
+    if (document.getElementById('outlook-error')) showFormError('outlook-error', e.message);
   } finally {
     _loading.outlook = false;
     if (btn) setLoading(btn, false, 'Ansluten ✓');
