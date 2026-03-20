@@ -24,7 +24,7 @@ function classifyTrip(trip) {
 
   // ── Check driver via location history ─────────────────────────────────────
   let driverVerified = null;
-  if (locationHistory && locationHistory.length) {
+if (typeof locationHistory !== 'undefined' && locationHistory && locationHistory.length) {
     // Convert trip start to timestamp
     const tripTs = new Date(trip.date + 'T' + trip.startTime + ':00').getTime();
     // Check if user was near start location at trip time (rough coords from address not available,
