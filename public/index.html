@@ -54,6 +54,11 @@
       <span>Outlook</span>
       <button class="conn-btn" onclick="showView('connect')">Anslut</button>
     </div>
+    <div class="conn-status" id="conn-gpx">
+      <div class="conn-dot disconnected"></div>
+      <span>GPS-data</span>
+      <button class="conn-btn" onclick="showView('connect')">Ladda upp</button>
+    </div>
   </nav>
 
   <!-- Main content -->
@@ -142,12 +147,46 @@
             </div>
           </div>
         </div>
+
+        <!-- GPS / GPX -->
+        <div class="connect-card" id="card-gpx">
+          <div class="connect-card-header">
+            <div class="service-icon" style="background:#34A853;">
+              <svg viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            </div>
+            <div>
+              <div class="service-name">GPS-data (valfritt)</div>
+              <div class="service-desc">Verifiera vem som körde via iPhone Hälsa GPX-filer</div>
+            </div>
+            <div class="service-status" id="gpx-status-badge">Ej laddad</div>
+          </div>
+
+          <div id="gpx-form">
+            <div class="steps">
+              <div class="step"><div class="step-num">1</div><div>Öppna <strong>Hälsa-appen</strong> på iPhone → din profil → <strong>Exportera hälsodata</strong>.</div></div>
+              <div class="step"><div class="step-num">2</div><div>Packa upp ZIP → gå till mappen <strong>workout-routes</strong> → välj GPX-filer för relevanta dagar.</div></div>
+              <div class="step"><div class="step-num">3</div><div>Ladda upp en eller flera GPX-filer nedan (du kan välja flera samtidigt).</div></div>
+            </div>
+            <input type="file" id="gpx-file" accept=".gpx" multiple onchange="handleGpxFiles(this)" style="display:none" />
+            <div class="btn-row">
+              <button class="btn btn-outline" id="gpx-import-btn" onclick="document.getElementById('gpx-file').click()">Välj GPX-filer →</button>
+            </div>
+          </div>
+
+          <div id="gpx-connected" style="display:none">
+            <div class="connected-info">
+              <div class="connected-vehicle" id="gpx-info"></div>
+              <button class="btn btn-ghost btn-sm" onclick="disconnectGpx()">Ta bort</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div id="analyze-bar" style="display:none">
         <div class="analyze-box">
           <div>
-            <div class="analyze-title">Båda tjänster anslutna</div>
+            <div class="analyze-title">Tjänster anslutna</div>
             <div class="analyze-sub">Klicka för att matcha resor mot kalender och klassificera dem.</div>
           </div>
           <button class="btn btn-primary" onclick="analyzeAndMatch()">Analysera resor →</button>
@@ -287,6 +326,7 @@
 <script src="js/ui.js"></script>
 <script src="js/export.js"></script>
 <script src="js/excel-import.js"></script>
+<script src="js/gpx-import.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
