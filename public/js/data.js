@@ -16,8 +16,12 @@ const State = {
   },
   analyzed: false,
   settings: {
-    rateWork: 2.50,
-    ratePrivate: 0
+    carType:      'company',
+    rateWork:     0,
+    ratePrivate:  0,
+    taxPrivate:   3.5,
+    electricRate: 9.5,
+    privateRate:  2.5
   }
 };
 

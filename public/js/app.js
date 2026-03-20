@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check session – this will also auto-fetch data if connected
   await checkSession();
+  await loadSettings();
 
   // Settings button in sidebar
   const sidebar     = document.querySelector('.sidebar');

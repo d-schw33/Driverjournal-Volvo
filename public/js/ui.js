@@ -7,14 +7,7 @@ function fmtDate(dateStr) {
   return `${DAYS_SV[d.getDay()]} ${d.getDate()} ${MONTHS_SV[d.getMonth()].slice(0,3)}`;
 }
 
-function fmtMonth(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  return `${MONTHS_SV[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function monthKey(dateStr) {
-  return dateStr.slice(0, 7); // "2026-03"
-}
+function monthKey(dateStr) { return dateStr.slice(0, 7); }
 
 function typeLabel(type) {
   if (type === 'work')    return 'Arbete';
@@ -26,6 +19,30 @@ function kr(amount) {
   return amount.toLocaleString('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' kr';
 }
 
+function compensationLabel() {
+  const s = State.settings;
+  if (s.carType === 'company')  return `${s.taxPrivate} kr/km · förmånsvärde privat`;
+  if (s.carType === 'electric') return `${s.electricRate} kr/km · arbetsresor`;
+  return `${s.privateRate} kr/km · arbetsresor`;
+}
+
+function compensationAmount(type, km) {
+  const s = State.settings;
+  if (s.carType === 'company') {
+    return type === 'private' ? km * s.taxPrivate : 0;
+  }
+  if (s.carType === 'electric') {
+    return type === 'work' ? km * s.electricRate : 0;
+  }
+  return type === 'work' ? km * s.privateRate : 0;
+}
+
+function compensationTitle() {
+  const s = State.settings;
+  if (s.carType === 'company')  return 'Förmånsvärde privat';
+  return 'Milersättning arbete';
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 function renderDashboard() {
   if (!State.volvo.trips.length) return;
@@ -33,21 +50,22 @@ function renderDashboard() {
   document.getElementById('dashboard-empty').style.display   = 'none';
   document.getElementById('dashboard-content').style.display = 'block';
 
-  const trips    = State.volvo.trips;
-  const work     = trips.filter(t => t.type === 'work');
-  const priv     = trips.filter(t => t.type === 'private');
-  const unknown  = trips.filter(t => t.type === 'unknown' || !t.type);
-  const totalKm  = trips.reduce((s,t) => s + t.km, 0);
-  const workKm   = work.reduce((s,t) => s + t.km, 0);
-  const privKm   = priv.reduce((s,t) => s + t.km, 0);
-  const workComp = workKm * State.settings.rateWork;
+  const trips   = State.volvo.trips;
+  const work    = trips.filter(t => t.type === 'work');
+  const priv    = trips.filter(t => t.type === 'private');
+  const unknown = trips.filter(t => t.type === 'unknown' || !t.type);
+  const totalKm = trips.reduce((s,t) => s + t.km, 0);
+  const workKm  = work.reduce((s,t) => s + t.km, 0);
+  const privKm  = priv.reduce((s,t) => s + t.km, 0);
 
-  // Period label
+  const compWork = work.reduce((s,t) => s + compensationAmount('work', t.km), 0);
+  const compPriv = priv.reduce((s,t) => s + compensationAmount('private', t.km), 0);
+  const totalComp = compWork + compPriv;
+
   const dates = trips.map(t => t.date).sort();
   document.getElementById('dashboard-period').textContent =
     `${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])} · ${trips.length} resor`;
 
-  // KPIs
   document.getElementById('kpi-grid').innerHTML = `
     <div class="kpi total">
       <div class="kpi-label">Total sträcka</div>
@@ -65,12 +83,11 @@ function renderDashboard() {
       <div class="kpi-sub">${priv.length} resor · ${unknown.length} oklass.</div>
     </div>
     <div class="kpi money">
-      <div class="kpi-label">Milersättning</div>
-      <div class="kpi-value" style="font-size:20px">${kr(workComp)}</div>
-      <div class="kpi-sub">${State.settings.rateWork} kr/km · arbete</div>
+      <div class="kpi-label">${compensationTitle()}</div>
+      <div class="kpi-value" style="font-size:20px">${kr(totalComp)}</div>
+      <div class="kpi-sub">${compensationLabel()}</div>
     </div>`;
 
-  // Donut chart (CSS-based)
   const pWork = totalKm ? Math.round(workKm / totalKm * 100) : 0;
   const pPriv = totalKm ? Math.round(privKm / totalKm * 100) : 0;
   const pUnkn = 100 - pWork - pPriv;
@@ -93,29 +110,28 @@ function renderDashboard() {
       </div>
     </div>`;
 
-  // Mileage bar chart by month
   const byMonth = {};
-  work.forEach(t => {
+  trips.forEach(t => {
     const k = monthKey(t.date);
-    byMonth[k] = (byMonth[k] || 0) + t.km;
+    if (!byMonth[k]) byMonth[k] = 0;
+    byMonth[k] += compensationAmount(t.type, t.km);
   });
   const months = Object.keys(byMonth).sort();
-  const maxKm  = Math.max(...Object.values(byMonth), 1);
+  const maxComp = Math.max(...Object.values(byMonth), 1);
   document.getElementById('mileage-chart').innerHTML =
     '<div class="bar-chart">' +
     months.map(m => {
-      const km   = byMonth[m];
-      const pct  = Math.round(km / maxKm * 100);
+      const comp = byMonth[m];
+      const pct  = Math.round(comp / maxComp * 100);
       const d    = new Date(m + '-01');
       const lbl  = MONTHS_SV[d.getMonth()].slice(0,3) + ' ' + d.getFullYear();
       return `
         <div class="bar-item">
-          <div class="bar-label"><span>${lbl}</span><span>${Math.round(km)} km · ${kr(km * State.settings.rateWork)}</span></div>
+          <div class="bar-label"><span>${lbl}</span><span>${kr(comp)}</span></div>
           <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#1D9E75"></div></div>
         </div>`;
     }).join('') + '</div>';
 
-  // Recent trips
   const recent = [...trips].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 6);
   document.getElementById('recent-trips').innerHTML = recent.map(t => tripRowHTML(t)).join('');
 }
@@ -138,10 +154,9 @@ function donutSegments(segments) {
 // ─── Trips view ──────────────────────────────────────────────────────────────
 function renderTrips() {
   if (!State.volvo.trips.length) return;
-  document.getElementById('trips-empty').style.display       = 'none';
-  document.getElementById('trips-table-wrap').style.display  = 'block';
+  document.getElementById('trips-empty').style.display      = 'none';
+  document.getElementById('trips-table-wrap').style.display = 'block';
 
-  // Populate month filter
   const months = [...new Set(State.volvo.trips.map(t => monthKey(t.date)))].sort().reverse();
   const sel    = document.getElementById('trip-month-filter');
   const curVal = sel.value;
@@ -152,9 +167,9 @@ function renderTrips() {
     }).join('');
   if (curVal) sel.value = curVal;
 
-  const mf   = document.getElementById('trip-month-filter').value;
-  const tf   = document.getElementById('trip-type-filter').value;
-  let trips  = [...State.volvo.trips].sort((a,b) => b.date.localeCompare(a.date));
+  const mf  = document.getElementById('trip-month-filter').value;
+  const tf  = document.getElementById('trip-type-filter').value;
+  let trips = [...State.volvo.trips].sort((a,b) => b.date.localeCompare(a.date));
   if (mf !== 'all') trips = trips.filter(t => t.date.startsWith(mf));
   if (tf !== 'all') trips = trips.filter(t => (t.type || 'unknown') === tf);
 
@@ -165,8 +180,8 @@ function renderTrips() {
 
 function tripRowHTML(t) {
   const type = t.type || 'unknown';
-  const comp = type === 'work' ? t.km * State.settings.rateWork :
-               type === 'private' ? t.km * State.settings.ratePrivate : null;
+  const comp = compensationAmount(type, t.km);
+  const showComp = comp > 0;
   return `
     <div class="trip-row" onclick="openTripModal(${t.id})">
       <div class="trip-type-dot ${type}"></div>
@@ -177,7 +192,7 @@ function tripRowHTML(t) {
       <div class="trip-stats">
         <div class="trip-stat"><div class="trip-stat-val">${t.km.toFixed(1)}</div><div class="trip-stat-label">km</div></div>
         <div class="trip-stat"><div class="trip-stat-val">${t.minutes}</div><div class="trip-stat-label">min</div></div>
-        ${comp !== null ? `<div class="trip-stat"><div class="trip-stat-val">${kr(comp)}</div><div class="trip-stat-label">ersättning</div></div>` : ''}
+        ${showComp ? `<div class="trip-stat"><div class="trip-stat-val">${kr(comp)}</div><div class="trip-stat-label">ersättning</div></div>` : ''}
       </div>
       <div class="trip-badge ${type}">${typeLabel(type)}</div>
     </div>`;
@@ -187,7 +202,7 @@ function openTripModal(id) {
   const t = State.volvo.trips.find(x => x.id === id);
   if (!t) return;
   const type = t.type || 'unknown';
-  const comp = type === 'work' ? t.km * State.settings.rateWork : null;
+  const comp = compensationAmount(type, t.km);
 
   document.getElementById('trip-modal-title').textContent = `${t.start} → ${t.end}`;
   document.getElementById('trip-modal-content').innerHTML = `
@@ -197,14 +212,16 @@ function openTripModal(id) {
       <div class="trip-detail-kpi"><div class="kpi-label">Körtid</div><div class="kpi-value">${t.minutes} <span class="kpi-unit">min</span></div></div>
       <div class="trip-detail-kpi"><div class="kpi-label">Snittfart</div><div class="kpi-value">${t.avgKmh} <span class="kpi-unit">km/h</span></div></div>
       <div class="trip-detail-kpi"><div class="kpi-label">Toppfart</div><div class="kpi-value">${t.maxKmh} <span class="kpi-unit">km/h</span></div></div>
-      ${t.fuelL ? `<div class="trip-detail-kpi"><div class="kpi-label">Bränsle</div><div class="kpi-value">${t.fuelL.toFixed(1)} <span class="kpi-unit">L</span></div></div>` : ''}
-      ${comp !== null ? `<div class="trip-detail-kpi"><div class="kpi-label">Milersättning</div><div class="kpi-value" style="font-size:18px">${kr(comp)}</div></div>` : ''}
+      ${t.fuelL ? `<div class="trip-detail-kpi"><div class="kpi-label">Bränsle/el</div><div class="kpi-value">${t.fuelL.toFixed(1)} <span class="kpi-unit">L/kWh</span></div></div>` : ''}
+      ${comp > 0 ? `<div class="trip-detail-kpi"><div class="kpi-label">${compensationTitle()}</div><div class="kpi-value" style="font-size:18px">${kr(comp)}</div></div>` : ''}
     </div>
     ${t.matchedEvent ? `
       <div class="matched-event">
         <div class="matched-event-title">Matchad händelse: ${t.matchedEvent.subject}</div>
         <div class="matched-event-time">${fmtDate(t.matchedEvent.date)} · ${t.matchedEvent.startTime}–${t.matchedEvent.endTime}${t.matchedEvent.location ? ' · ' + t.matchedEvent.location : ''}</div>
       </div>` : ''}
+    ${t.driverVerified && t.driverVerified !== 'no-data' ? `
+      <div style="margin-bottom:1rem">${driverBadgeHTML(t.driverVerified)}</div>` : ''}
     <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">Klassificering</div>
     <div class="trip-classify-btns">
       <button class="classify-btn work ${type==='work'?'active':''}" onclick="reclassifyTrip(${t.id},'work');document.getElementById('trip-modal').style.display='none'">✓ Arbetsresa</button>
@@ -264,9 +281,11 @@ function renderSummary() {
       const workKm  = data.work.reduce((s,t) => s+t.km, 0);
       const privKm  = data.private.reduce((s,t) => s+t.km, 0);
       const totalKm = all.reduce((s,t) => s+t.km, 0);
-      const comp    = workKm * State.settings.rateWork;
-      const d       = new Date(m + '-01');
-      const label   = `${MONTHS_SV[d.getMonth()]} ${d.getFullYear()}`;
+      const compWork = data.work.reduce((s,t) => s + compensationAmount('work', t.km), 0);
+      const compPriv = data.private.reduce((s,t) => s + compensationAmount('private', t.km), 0);
+      const totalComp = compWork + compPriv;
+      const d     = new Date(m + '-01');
+      const label = `${MONTHS_SV[d.getMonth()]} ${d.getFullYear()}`;
 
       return `
         <div class="summary-month">
@@ -276,20 +295,18 @@ function renderSummary() {
               <span><strong>${all.length}</strong> resor</span>
               <span><strong>${Math.round(workKm)}</strong> km arbete</span>
               <span><strong>${Math.round(privKm)}</strong> km privat</span>
-              <span style="color:var(--work)"><strong>${kr(comp)}</strong></span>
+              <span style="color:var(--work)"><strong>${kr(totalComp)}</strong></span>
             </div>
           </div>
           <div class="summary-month-body" id="sm-${m}">
             <table class="summary-table-inner">
               <thead>
-                <tr>
-                  <th>Datum</th><th>Från</th><th>Till</th><th>Km</th><th>Typ</th><th>Ersättning</th>
-                </tr>
+                <tr><th>Datum</th><th>Från</th><th>Till</th><th>Km</th><th>Typ</th><th>${compensationTitle()}</th></tr>
               </thead>
               <tbody>
                 ${all.sort((a,b) => a.date.localeCompare(b.date)).map(t => {
                   const type = t.type || 'unknown';
-                  const c = type === 'work' ? t.km * State.settings.rateWork : type === 'private' ? t.km * State.settings.ratePrivate : 0;
+                  const c = compensationAmount(type, t.km);
                   return `<tr>
                     <td>${fmtDate(t.date)}</td>
                     <td>${t.start}</td>
@@ -303,7 +320,7 @@ function renderSummary() {
                   <td colspan="3">Totalt</td>
                   <td>${totalKm.toFixed(1)}</td>
                   <td></td>
-                  <td>${kr(comp)}</td>
+                  <td>${kr(totalComp)}</td>
                 </tr>
               </tbody>
             </table>
@@ -313,26 +330,5 @@ function renderSummary() {
 }
 
 function toggleSummaryMonth(id) {
-  const el = document.getElementById(id);
-  el.classList.toggle('open');
-}
-
-// ─── Settings modal ──────────────────────────────────────────────────────────
-function openSettings() {
-  document.getElementById('rate-work').value    = State.settings.rateWork;
-  document.getElementById('rate-private').value = State.settings.ratePrivate;
-  document.getElementById('settings-modal').style.display = 'flex';
-}
-
-function saveSettings() {
-  State.settings.rateWork    = parseFloat(document.getElementById('rate-work').value)    || 2.50;
-  State.settings.ratePrivate = parseFloat(document.getElementById('rate-private').value) || 0;
-  document.getElementById('settings-modal').style.display = 'none';
-  renderDashboard();
-  renderTrips();
-  renderSummary();
-}
-
-function closeSettings(e) {
-  if (e.target.id === 'settings-modal') document.getElementById('settings-modal').style.display = 'none';
+  document.getElementById(id).classList.toggle('open');
 }
