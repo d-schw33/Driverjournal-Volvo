@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = {
   rateWork:     0,           // kr/km för arbetsresor
   ratePrivate:  0,           // kr/km för privatresor (skattepliktig förmån)
   taxPrivate:   3.5,         // kr/km förmånsvärde tjänstebil privat (Skatteverket 2026)
-  electricRate: 9.5,         // kr/km för elbil arbetsresor
+  electricRate: 0.95,         // kr/km för elbil arbetsresor
   privateRate:  2.5,         // kr/km för privatbil arbetsresor (Skatteverket)
 };
 
