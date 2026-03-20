@@ -12,14 +12,12 @@ function showView(name) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Read URL params BEFORE anything else
   const params     = new URLSearchParams(window.location.search);
   const errorParam = params.get('error');
   window.history.replaceState({}, document.title, '/');
 
   showView('connect');
 
-  // Show error if redirected with error
   if (errorParam) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'background:#FCEBEB;color:#791F1F;border:0.5px solid #F7C1C1;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:1rem;';
@@ -29,7 +27,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => errEl.remove(), 8000);
   }
 
-  // Check session – this will also auto-fetch data if connected
   await checkSession();
   await loadSettings();
 

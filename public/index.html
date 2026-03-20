@@ -85,7 +85,6 @@
             </div>
             <div class="service-status" id="volvo-status-badge">Ej ansluten</div>
           </div>
-
           <div id="volvo-form">
             <div class="form-row">
               <label class="label">API-nyckel (VCC-Api-Key från developer.volvocars.com)</label>
@@ -110,7 +109,6 @@
               <div id="excel-import-status" style="font-size:13px;color:#1D9E75;margin-top:6px;"></div>
             </div>
           </div>
-
           <div id="volvo-connected" style="display:none">
             <div class="connected-info">
               <div class="connected-vehicle" id="volvo-vehicle-info"></div>
@@ -131,7 +129,6 @@
             </div>
             <div class="service-status" id="outlook-status-badge">Ej ansluten</div>
           </div>
-
           <div id="outlook-form">
             <div class="form-error" id="outlook-error"></div>
             <div class="btn-row">
@@ -139,7 +136,6 @@
               <button class="btn btn-ghost" onclick="loadOutlookDemo()">Använd demodata</button>
             </div>
           </div>
-
           <div id="outlook-connected" style="display:none">
             <div class="connected-info">
               <div class="connected-vehicle" id="outlook-user-info"></div>
@@ -160,7 +156,6 @@
             </div>
             <div class="service-status" id="gpx-status-badge">Ej laddad</div>
           </div>
-
           <div id="gpx-form">
             <div class="steps">
               <div class="step"><div class="step-num">1</div><div>Öppna <strong>Hälsa-appen</strong> på iPhone → din profil → <strong>Exportera hälsodata</strong>.</div></div>
@@ -172,7 +167,6 @@
               <button class="btn btn-outline" id="gpx-import-btn" onclick="document.getElementById('gpx-file').click()">Välj GPX-filer →</button>
             </div>
           </div>
-
           <div id="gpx-connected" style="display:none">
             <div class="connected-info">
               <div class="connected-vehicle" id="gpx-info"></div>
@@ -214,7 +208,7 @@
             <div id="type-chart"></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">Milersättning</div>
+            <div class="chart-title">Ersättning per månad</div>
             <div id="mileage-chart"></div>
           </div>
         </div>
@@ -298,14 +292,35 @@
       <button class="modal-close" onclick="document.getElementById('settings-modal').style.display='none'">✕</button>
     </div>
     <div class="form-row">
-      <label class="label">Milersättning arbete (kr/km)</label>
-      <input type="number" id="rate-work" value="2.50" step="0.10" min="0" />
+      <label class="label">Biltyp</label>
+      <select id="setting-car-type" onchange="updateSettingsUI(this.value)">
+        <option value="company">Tjänstebil med betalt drivmedel</option>
+        <option value="electric">Elbil – ersättning för tjänsteresor</option>
+        <option value="private">Privat bil – milersättning</option>
+      </select>
     </div>
-    <div class="form-row">
-      <label class="label">Milersättning privat (kr/km)</label>
-      <input type="number" id="rate-private" value="0" step="0.10" min="0" />
+    <div id="settings-company">
+      <div class="form-row">
+        <label class="label">Förmånsvärde privat körning (kr/km)</label>
+        <input type="number" id="setting-tax-private" value="3.5" step="0.1" min="0" />
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">Skatteverkets schablonvärde 2026: 3,50 kr/km</div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="saveSettings()">Spara</button>
+    <div id="settings-electric" style="display:none">
+      <div class="form-row">
+        <label class="label">Milersättning tjänsteresor (kr/km)</label>
+        <input type="number" id="setting-electric-rate" value="9.5" step="0.1" min="0" />
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">Skatteverkets skattefria gräns 2026: 9,50 kr/km</div>
+      </div>
+    </div>
+    <div id="settings-private" style="display:none">
+      <div class="form-row">
+        <label class="label">Milersättning tjänsteresor (kr/km)</label>
+        <input type="number" id="setting-private-rate" value="2.5" step="0.1" min="0" />
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">Skatteverkets skattefria gräns 2026: 2,50 kr/km</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()" style="width:100%;margin-top:0.5rem">Spara inställningar</button>
   </div>
 </div>
 
@@ -321,6 +336,7 @@
 </div>
 
 <script src="js/data.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/api.js"></script>
 <script src="js/match.js"></script>
 <script src="js/ui.js"></script>
@@ -328,6 +344,5 @@
 <script src="js/excel-import.js"></script>
 <script src="js/gpx-import.js"></script>
 <script src="js/app.js"></script>
-<script src="js/settings.js"></script>
 </body>
 </html>
