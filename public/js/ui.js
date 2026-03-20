@@ -158,7 +158,11 @@ function renderTrips() {
 
   const mf  = document.getElementById('trip-month-filter').value;
   const tf  = document.getElementById('trip-type-filter').value;
-  let trips = [...State.volvo.trips].sort((a,b) => b.date.localeCompare(a.date));
+let trips = [...State.volvo.trips].sort((a,b) => {
+  const dateComp = b.date.localeCompare(a.date);
+  if (dateComp !== 0) return dateComp;
+  return b.startTime.localeCompare(a.startTime);
+});
   if (mf !== 'all') trips = trips.filter(t => t.date.startsWith(mf));
   if (tf !== 'all') trips = trips.filter(t => (t.type || 'unknown') === tf);
 
