@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -94,6 +95,15 @@
               <button class="btn btn-volvo" id="volvo-btn" onclick="startVolvoLogin()">Logga in med Volvo ID →</button>
               <button class="btn btn-ghost" onclick="loadVolvoDemo()">Använd demodata</button>
             </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
+              <label class="label">Eller importera från Volvo Cars-appen (Excel)</label>
+              <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="handleExcelFile(this)" style="display:none" />
+              <div class="btn-row">
+                <button class="btn btn-outline" id="excel-import-btn" onclick="document.getElementById('excel-file').click()">Importera Excel-fil →</button>
+              </div>
+              <div class="form-error" id="excel-import-error"></div>
+              <div id="excel-import-status" style="font-size:13px;color:#1D9E75;margin-top:6px;"></div>
+            </div>
           </div>
 
           <div id="volvo-connected" style="display:none">
@@ -118,8 +128,6 @@
           </div>
 
           <div id="outlook-form">
-
-
             <div class="form-error" id="outlook-error"></div>
             <div class="btn-row">
               <button class="btn btn-outlook" id="outlook-btn" onclick="startMsLogin()">Logga in med Microsoft →</button>
@@ -243,7 +251,7 @@
   </main>
 </div>
 
-<!-- Settings modal for mileage rate -->
+<!-- Settings modal -->
 <div id="settings-modal" class="modal-overlay" style="display:none" onclick="closeSettings(event)">
   <div class="modal">
     <div class="modal-header">
@@ -278,6 +286,7 @@
 <script src="js/match.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/export.js"></script>
+<script src="js/excel-import.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
